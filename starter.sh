@@ -45,7 +45,10 @@ echo "======================================"
 # ------------------------------------------------------------
 
 echo "[1] Checking root privileges..."
-
+if [ "$(id -u)" -ne 0 ]; then
+    echo "Error: This script must be run as root." >&2
+    exit 1
+fi
 # TODO:
 
 # Add a check that exits if the script is not running as root.
@@ -57,7 +60,10 @@ echo "[1] Checking root privileges..."
 # ------------------------------------------------------------
 
 echo "[2] Checking SELinux..."
-
+if [ "$(getenforce)" != "Enforcing" ]; then
+    echo "Error: SELinux is not set to Enforcing." >&2
+    exit 1
+fi
 # TODO:
 
 # Verify that SELinux is enabled and enforcing.
@@ -79,7 +85,9 @@ echo "[2] Checking SELinux..."
 # ------------------------------------------------------------
 
 echo "[3] Creating group: ${GROUP_NAME}"
-
+if ! getent group "${GROUP_NAME}" >/dev/null 2>&1; then
+    groupadd "${GROUP_NAME}"
+fi
 # TODO:
 
 # Create the group if it does not already exist.
@@ -91,7 +99,13 @@ echo "[3] Creating group: ${GROUP_NAME}"
 # ------------------------------------------------------------
 
 echo "[4] Creating users..."
+id -u "${USER1}" >/dev/null 2>&1 || useradd -g "${GROUP_NAME}" "${USER1}"
+id -u "${USER2}" >/dev/null 2>&1 || useradd -g "${GROUP_NAME}" "${USER2}"
+id -u "${UNAUTHORIZED}" >/dev/null 2>&1 || useradd "${UNAUTHORIZED}"
 
+# Ensure user group memberships are exact
+usermod -aG "${GROUP_NAME}" "${USER1}"
+usermod -aG "${GROUP_NAME}" "${USER2}"
 # TODO:
 
 # Create:
@@ -115,7 +129,7 @@ echo "[4] Creating users..."
 # ------------------------------------------------------------
 
 echo "[5] Creating directory..."
-
+mkdir -p "${STUDENT_DIR}"
 # TODO:
 
 # Create:
@@ -131,7 +145,8 @@ echo "[5] Creating directory..."
 # ------------------------------------------------------------
 
 echo "[6] Configuring ownership and permissions..."
-
+chown -R root:"${GROUP_NAME}" "${BASE_DIR}"
+chmod 2770 "${STUDENT_DIR}"
 # TODO:
 
 # Set the appropriate owner/group.
@@ -161,7 +176,9 @@ echo "[6] Configuring ownership and permissions..."
 # ------------------------------------------------------------
 
 echo "[7] Creating test file..."
-
+echo "Welcome to the student directory." > "${TEST_FILE}"
+chown root:"${GROUP_NAME}" "${TEST_FILE}"
+chmod 0660 "${TEST_FILE}"
 # TODO:
 
 # Create:
@@ -177,9 +194,10 @@ echo "[7] Creating test file..."
 # TODO 8: Configure persistent SELinux file context
 
 # ------------------------------------------------------------
-
+ 
 echo "[8] Configuring SELinux file context..."
-
+semanage fcontext -a -t "${SELINUX_TYPE}" "${STUDENT_DIR}(/.*)?"
+restorecon -R -v "${STUDENT_DIR}"
 # TODO:
 
 # Install/use semanage if required.
@@ -205,7 +223,7 @@ echo "[8] Configuring SELinux file context..."
 # ------------------------------------------------------------
 
 echo "[9] Configuring SELinux boolean..."
-
+setsebool -P "${SELINUX_BOOLEAN}" on
 # TODO:
 
 # Select an appropriate SELinux boolean for the service/context
